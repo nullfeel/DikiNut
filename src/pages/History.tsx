@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navigation from '../components/Navigation';
+import { Trash2 } from 'lucide-react';
 
 interface MealHistory {
   id: string;
@@ -18,30 +19,32 @@ export default function History() {
   const { user } = useAuth();
   const [meals, setMeals] = useState<MealHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchTodaysMeals = async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const { data, error } = await supabase
-        .from('meal_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('date_added', today.toISOString())
-        .order('date_added', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching meals:', error);
-        return;
-      }
-
-      setMeals(data);
-      setLoading(false);
-    };
-
     fetchTodaysMeals();
   }, [user]);
+
+  const fetchTodaysMeals = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from('meal_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('date_added', today.toISOString())
+      .order('date_added', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching meals:', error);
+      return;
+    }
+
+    setMeals(data);
+    setLoading(false);
+  };
 
   const calculateTotals = () => {
     return meals.reduce(
@@ -53,6 +56,26 @@ export default function History() {
       }),
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeleting(id);
+    try {
+      const { error } = await supabase
+        .from('meal_history')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      setMeals(meals.filter(meal => meal.id !== id));
+    } catch (error) {
+      console.error('Error deleting meal:', error);
+    } finally {
+      setDeleting(null);
+      setShowConfirm(null);
+    }
   };
 
   const totals = calculateTotals();
@@ -96,10 +119,36 @@ export default function History() {
           {meals.map((meal) => (
             <div key={meal.id} className="bg-white rounded-lg shadow-md p-4">
               <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-gray-800">{meal.recipe_name}</h3>
-                <span className="text-sm text-gray-500">
-                  {format(new Date(meal.date_added), 'h:mm a')}
-                </span>
+                <div>
+                  <h3 className="font-semibold text-gray-800">{meal.recipe_name}</h3>
+                  <span className="text-sm text-gray-500">
+                    {format(new Date(meal.date_added), 'h:mm a')}
+                  </span>
+                </div>
+                {showConfirm === meal.id ? (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleDelete(meal.id)}
+                      disabled={deleting === meal.id}
+                      className="px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50"
+                    >
+                      {deleting === meal.id ? 'Deleting...' : 'Confirm'}
+                    </button>
+                    <button
+                      onClick={() => setShowConfirm(null)}
+                      className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowConfirm(meal.id)}
+                    className="p-1 text-gray-400 hover:text-red-600 transition-colors duration-200"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-4 gap-2 text-sm text-gray-600">
                 <div>
