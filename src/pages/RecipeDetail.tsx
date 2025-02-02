@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Navigation from '../components/Navigation';
+import RecipeInstructions from '../components/RecipeInstructions';
 import { Recipe, getRecipeById } from '../lib/spoonacular';
 
 export default function RecipeDetail() {
@@ -57,6 +58,14 @@ export default function RecipeDetail() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const formatInstructions = (instructions: string): string[] => {
+    // Remove any HTML tags and split by numbers or periods followed by a space
+    return instructions
+      .replace(/<[^>]*>/g, '')
+      .split(/(?:\d+\.|\.)\s+/)
+      .filter(step => step.trim().length > 0);
   };
 
   if (loading) {
@@ -138,7 +147,7 @@ export default function RecipeDetail() {
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Instructions</h2>
               <div className="prose prose-sm max-w-none text-gray-700">
-                {recipe.instructions}
+                <RecipeInstructions instructions={formatInstructions(recipe.instructions)} />
               </div>
             </div>
           )}
